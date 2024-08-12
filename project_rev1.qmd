@@ -1,0 +1,164 @@
+--- 
+title: "무적 1조 아자아자 화이팅"
+author: "최강 1조"
+format: dashboard
+freeze: true
+--- 
+
+```{python}
+
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+df =pd.read_csv('houseprice-with-lonlat.csv')
+house_train=pd.read_csv("train.csv")
+```
+
+```{python}
+#| output: false
+bins=np.array([1870,1879,1889,1899,1909,1919,1929,1939,
+               1949,1959,1969,1979,1989,1999,2009,2019])
+df['Years']=pd.cut(df['Year_Built'], bins,
+                       labels=(np.arange(187,202)*10).astype(int))
+
+years_roof = df.groupby(['Years','Roof_Style'])\
+               .agg(count_roof=('Roof_Style', 'count'))\
+               .reset_index()
+
+fig1 = px.bar(
+    years_roof,
+    x='Years',
+    y='count_roof',
+    color='Roof_Style',
+    title='Roof Styles over Years',
+    labels={'Roof_Style': 'Roof Style', 'count_roof': 'Count'},
+    barmode='stack'
+)
+
+```
+```{python}
+#| output: false
+years_ext = df.groupby(['Years','Exterior_1st'])\
+               .agg(count_ext=('Exterior_1st', 'count'))\
+               .reset_index()
+
+fig2 = px.bar(
+    years_ext,
+    x='Exterior_1st',
+    y='count_ext',
+    animation_frame='Years',
+    title='Exterior over Years',
+    color="Exterior_1st",
+    labels={'Exterior_1st': 'Exterior', 'count_ext': 'Count'}
+)
+
+```
+```{python}
+#| output: false
+fig3 = px.scatter(
+    house_train,
+    x="GrLivArea",
+    y="SalePrice",
+    color="Neighborhood",
+    trendline = 'ols',
+    size_max=1 # 점의 최대 크기 설정
+)
+
+# 레이아웃 업데이트
+fig3.update_layout(
+    title=dict(text="지상생활면적에 따른 집 가격", font=dict(size=24)),
+    xaxis=dict(
+        title=dict(text="지상생활면적 (sqft)", font=dict(size=18)), 
+        tickfont=dict(size=14),
+        gridcolor='rgba(255, 255, 255, 0.2)'
+    ),
+    yaxis=dict(
+        title=dict(text="집 가격 ($)", font=dict(size=18)), 
+        tickfont=dict(size=14),
+        gridcolor='rgba(255, 255, 255, 0.2)'
+    ),
+    legend_title=dict(text='에임스 시내 위치', font=dict(size=18)),
+    legend=dict(font=dict(size=14)),
+)
+```
+
+```{python}
+#| output: false
+import folium
+from folium import IFrame
+import plotly.express as px
+
+# Ames 지도 생성
+map_ames = folium.Map(
+    location=[42.03, -93.64289689856655],
+    zoom_start=12, 
+    tiles='cartodbpositron'
+)
+
+# 색상 목록 정의
+colors = ['blue', 'green', 'red', 'purple', 'orange', 'darkred', 'darkblue', 'darkgreen', 
+          'pink', 'lightblue', 'lightgreen']
+
+# Neighborhood별로 산점도 생성 및 HTML 변환
+for idx, neighborhood in enumerate(df['Neighborhood'].unique()):
+    # 해당 Neighborhood 데이터 추출
+    df_neigh = df.query('Neighborhood == @neighborhood')
+    
+    # scatter plot 생성
+    fig = px.scatter(
+        df_neigh,
+        x='Gr_Liv_Area',
+        y='Sale_Price',
+        title=f'{neighborhood} - GrLivArea vs SalePrice',
+        labels={'Gr_Liv_Area': 'Living Area', 'Sale_Price': 'Sale Price'},
+        trendline='ols'
+    )
+    
+    # 회귀 직선의 색상 변경
+    fig.update_traces(line=dict(color='red', width=2), selector=dict(mode='lines'))
+
+    # 그래프를 HTML로 변환
+    html = fig.to_html(include_plotlyjs='cdn')
+    
+    # Folium 팝업을 위한 IFrame 생성
+    iframe = IFrame(html, width=600, height=400)
+    popup = folium.Popup(iframe, max_width=600)
+    
+    # 각 Neighborhood의 중심 좌표 계산 (여기서는 평균 좌표 사용)
+    lat = df_neigh['Latitude'].mean()
+    lon = df_neigh['Longitude'].mean()
+    
+    # 마커 색상 결정
+    color = colors[idx % len(colors)]  # 색상을 순환해서 사용
+    
+    # Folium 마커 추가 (지도를 덮어 쓰지 않고, 계속해서 마커를 추가함)
+    folium.Marker(
+        location=[lat, lon],
+        popup=popup,
+        icon=folium.Icon(color=color, icon='info-sign')
+    ).add_to(map_ames)
+
+# 지도를 반환하여 표시 (반복 생성하지 않음)
+```
+
+## Row {height=40%}
+```{python}
+#| title: Roof Styles over Years
+fig1.show()
+```
+```{python}
+#| title: Exterior over Years
+fig2.show()
+```
+
+## Row {height=60%}
+```{python}
+#| title: 지상생활면적에 따른 집 가격
+fig3.show()
+```
+```{python}
+#| title: 에임스 시내 위치에 따른 지상생활면적 vs. 집 가격
+map_ames
+```

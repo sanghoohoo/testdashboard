@@ -1,0 +1,237 @@
+--- 
+title: "무적 1조 아자아자 화이팅"
+author: "최강 1조"
+format: dashboard
+--- 
+
+```{python}
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+df =pd.read_csv('houseprice-with-lonlat.csv')
+house_train=pd.read_csv("train.csv")
+```
+
+## Row {height=60%}
+
+```{python}
+#| title: Roof Styles over Years
+
+bins=np.array([1870,1879,1889,1899,1909,1919,1929,1939,
+               1949,1959,1969,1979,1989,1999,2009,2019])
+df['Years']=pd.cut(df['Year_Built'], bins,
+                       labels=(np.arange(187,202)*10).astype(int))
+
+years_roof = df.groupby(['Years','Roof_Style'])\
+               .agg(count_roof=('Roof_Style', 'count'))\
+               .reset_index()
+
+fig = px.bar(
+    years_roof,
+    x='Years',
+    y='count_roof',
+    color='Roof_Style',
+    title='Roof Styles over Years',
+    labels={'Roof_Style': 'Roof Style', 'count_roof': 'Count'},
+    barmode='stack'
+)
+
+fig.show()
+```
+```{python}
+#| title: Exterior over Years
+years_ext = df.groupby(['Years','Exterior_1st'])\
+               .agg(count_ext=('Exterior_1st', 'count'))\
+               .reset_index()
+
+fig = px.bar(
+    years_ext,
+    x='Exterior_1st',
+    y='count_ext',
+    animation_frame='Years',
+    title='Exterior over Years',
+    color="Exterior_1st",
+    labels={'Exterior_1st': 'Exterior', 'count_ext': 'Count'}
+)
+
+fig.show()
+```
+```{python}
+
+fig = px.scatter(
+    house_train,
+    x="GrLivArea",
+    y="SalePrice",
+    color="Neighborhood",
+    trendline = 'ols',
+    size_max=10  # 점의 최대 크기 설정
+)
+
+# 레이아웃 업데이트
+fig.update_layout(
+    title=dict(text="지상생활면적에 따른 집 가격", font=dict(size=24, color="white")),
+    paper_bgcolor="black",
+    plot_bgcolor="black",
+    font=dict(color="white"),
+    xaxis=dict(
+        title=dict(text="지상생활면적 (sqft)", font=dict(size=18, color="white")), 
+        tickfont=dict(size=14, color="white"),
+        gridcolor='rgba(255, 255, 255, 0.2)'  # 그리드 색깔 조정
+    ),
+    yaxis=dict(
+        title=dict(text="집 가격 ($)", font=dict(size=18, color="white")), 
+        tickfont=dict(size=14, color="white"),
+        gridcolor='rgba(255, 255, 255, 0.2)'  # 그리드 색깔 조정
+    ),
+    legend_title=dict(text='에임스 시내 위치', font=dict(size=18, color='white')),
+    legend=dict(font=dict(size=14, color="white")),
+)
+
+
+# neighborhood_dummies = pd.get_dummies(
+#     house_train['Neighborhood'],
+#     drop_first=True)
+#     
+# # neighborhood_dummies.columns
+# 
+# 
+# # x와 y 설정
+# x = pd.concat([house_train['GrLivArea'], neighborhood_dummies], axis=1)
+# y = house_train["SalePrice"]
+# 
+# 
+# # 모델 학습
+# model = LinearRegression()
+# model.fit(x,y)
+# 
+# linear_fit = model.predict(x)
+# ##
+# fig.add_trace(go.Scatter(
+#     mode = 'lines',
+#     x = house_train['GrLivArea'],
+#     y = linear_fit,
+#     name = '선형회귀직선',
+#     line = dict(dash = 'dot')
+# ))
+
+fig.show()
+#| title: Foundation over Years
+
+# years_fnd = df.groupby(['Years','Foundation'])\
+#                .agg(count_fnd=('Foundation', 'count'))\
+#                .reset_index()
+# 
+# fig = px.bar(
+#     years_fnd,
+#     x='Foundation',
+#     y='count_fnd',
+#     animation_frame='Years',
+#     title='Foundation over Years',
+#     color="Foundation",
+#     labels={'Foundation': 'Foundation', 'count_fnd': 'Count'}
+# )
+# 
+# fig.show()
+
+# fig = px.scatter(
+#     years_fnd,
+#     x='Foundation',
+#     y='count_fnd',
+#     size='count_fnd',
+#     color='Foundation',
+#     animation_frame='Years',
+#     animation_group='Foundation',
+#     title='Foundation Count over Years',
+#     labels={'Foundation': 'Foundation', 'count_fnd': 'Count'},
+#     range_y=[0, max(years_fnd['count_fnd']) + 1]
+# )
+# 
+# fig = px.pie(
+#     years_fnd,
+#     values='count_fnd',
+#     names='Foundation',
+#     animation_frame='Years',
+#     title='Foundation over Years',
+#     color='Foundation',
+#     labels={'Foundation': 'Foundation', 'count_fnd': 'Count'}
+# )
+# 
+# # 차트 표시
+# fig.show()
+```
+
+## Row {height=40%}
+```{python}
+import folium
+from folium import IFrame
+neighborhood_lon = df.groupby('Neighborhood')\
+                     .agg(lon_mean=('Longitude', 'mean'))\
+                     .reset_index()
+neighborhood_lat = df.groupby('Neighborhood')\
+                     .agg(lat_mean=('Latitude', 'mean'))\
+                     .reset_index()
+neighborhood_lonlat = pd.merge(neighborhood_lon, neighborhood_lat,
+                               how='left', on='Neighborhood')
+                               
+map_ames=folium.Map(location = [42.03448223395904, -93.64289689856655],
+                             zoom_start = 13, tiles='cartodbpositron')
+                             
+df.columns
+
+# 선명한 색상 목록 정의
+colors = ['blue', 'green', 'red', 'purple', 'orange', 'darkred', 'darkblue', 'darkgreen', 'pink', 'lightblue', 'lightgreen']
+
+# Neighborhood별로 산점도 생성 및 HTML 변환
+for idx, neighborhood in enumerate(df['Neighborhood'].unique()):
+    # 해당 Neighborhood 데이터 추출
+    df_neigh = df.query('Neighborhood == @neighborhood')
+    
+    # Plotly scatter plot 생성 (선형 회귀 직선 포함)
+    fig = px.scatter(
+        df_neigh,
+        x='Gr_Liv_Area',
+        y='Sale_Price',
+        title=f'{neighborhood} - GrLivArea vs SalePrice',
+        labels={'Gr_Liv_Area': 'Living Area', 'Sale_Price': 'Sale Price'},
+        trendline='ols'  # 선형 회귀 직선 추가
+    )
+    
+    # 회귀 직선의 색상 변경
+    fig.update_traces(line=dict(color='red', width=2), selector=dict(mode='lines'))
+
+    # 그래프를 HTML로 변환
+    html = fig.to_html(include_plotlyjs='cdn')
+    
+    # Folium 팝업을 위한 IFrame 생성
+    iframe = IFrame(html, width=600, height=400)
+    popup = folium.Popup(iframe, max_width=600)
+    
+    # 각 Neighborhood의 중심 좌표 계산 (여기서는 평균 좌표 사용)
+    lat = df_neigh['Latitude'].mean()
+    lon = df_neigh['Longitude'].mean()
+    
+    # 마커 색상 결정
+    color = colors[idx % len(colors)]  # 색상을 순환해서 사용
+    
+    # Folium 마커 추가
+    folium.Marker(
+        location=[lat, lon],
+        popup=popup,
+        icon=folium.Icon(color=color, icon='info-sign')
+    ).add_to(map_ames)
+
+# map_ames
+#map_ames.save('neigh_map2.html')
+
+# Folium 지도를 HTML로 변환
+map_html = map_ames._repr_html_()
+```
+# Interactive Map
+
+```{html}
+{{ map_html | safe }}
+
+```{html}
+<iframe src="neigh_map2.html" width="100%" height="600px" style="border:0;"></iframe>

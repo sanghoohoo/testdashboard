@@ -1,0 +1,65 @@
+--- 
+title: "무적 1조 아자아자 화이팅"
+author: "최강 1조"
+format: dashboard
+freeze: true
+--- 
+
+```{python}
+#| output: false
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import json
+import folium
+from folium import IFrame
+
+df_iowa = pd.read_excel('Iowa ACT 5 Year Trends by District for Graduating Classes 2019 to 2023 (2).xlsx')
+df_iowa
+geo_iowa = json.load(open('Iowa_School_Districts_2023-2024.geojson', encoding='UTF-8'))
+geo_iowa
+
+map_iowa = folium.Map(
+    location=[42.03, -93.64289689856655],
+    zoom_start=12, 
+    tiles='cartodbpositron'
+)
+folium.Choropleth(
+    geo_data = geo_iowa)\
+    .add_to(map_iowa)
+
+map_iowa
+df_iowa
+df_iowa.columns = df_iowa.iloc[1]
+df_iowa = df_iowa.iloc[2:,:]
+df_iowa.reset_index(drop=True)
+df_iowa
+grade_mean = df_iowa.groupby('ACT Dist Code')\
+               .agg(count_roof=('CRB % All Four', 'mean'))\
+               .reset_index()
+grade_mean
+```
+
+
+
+## Row {height=40%}
+```{python}
+#| title: Roof Styles over Years
+fig1.show()
+```
+```{python}
+#| title: Exterior over Years
+fig2.show()
+```
+
+## Row {height=60%}
+```{python}
+#| title: 지상생활면적에 따른 집 가격
+fig3.show()
+```
+```{python}
+#| title: 에임스 시내 위치에 따른 지상생활면적 vs. 집 가격
+map_ames
+```
