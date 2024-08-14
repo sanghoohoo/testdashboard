@@ -1,0 +1,432 @@
+--- 
+title: "Ames"
+author: "무적 1조"
+format: 
+  dashboard:
+    scrolling: true
+    logo: ./image/houseprice_logo.png
+freeze: true
+--- 
+
+# 특징
+
+```{python}
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import json
+import folium
+import re
+from fuzzywuzzy import process
+from branca.element import IFrame
+
+# 데이터 로드
+df_iowa = pd.read_excel('./data/Iowa ACT 5 Year Trends by District for Graduating Classes 2019 to 2023 (2).xlsx')
+geo_iowa = json.load(open('./data/Iowa_School_Districts_2023-2024.geojson', encoding='UTF-8'))
+df =pd.read_csv('./data/houseprice-with-lonlat.csv')
+house_train=pd.read_csv("./data/train.csv")
+major = pd.read_csv('./data/Majors Awarded.csv')
+df_sex=pd.read_csv('./data/Sex_Breakdown_for_Common_Majors.csv')
+df_major = pd.read_csv('./data/Common_Jobs_by_Major.csv')
+```
+
+```{python}
+#| output: false
+bins=np.array([1870,1879,1889,1899,1909,1919,1929,1939,
+               1949,1959,1969,1979,1989,1999,2009,2019])
+df['Years']=pd.cut(df['Year_Built'], bins,
+                       labels=(np.arange(187,202)*10).astype(int))
+
+years_roof = df.groupby(['Years','Roof_Style'])\
+               .agg(count_roof=('Roof_Style', 'count'))\
+               .reset_index()
+
+fig1 = px.bar(
+    years_roof,
+    x='Years',
+    y='count_roof',
+    color='Roof_Style',
+    title='연도별 지붕 스타일',
+    labels={'Roof_Style': 'Roof Style', 'count_roof': 'Count'},
+    barmode='stack'
+)
+
+```
+```{python}
+#| output: false
+years_ext = df.groupby(['Years','Exterior_1st'])\
+               .agg(count_ext=('Exterior_1st', 'count'))\
+               .reset_index()
+
+fig2 = px.bar(
+    years_ext,
+    x='Exterior_1st',
+    y='count_ext',
+    animation_frame='Years',
+    title='연도별 외장재',
+    color="Exterior_1st",
+    labels={'Exterior_1st': 'Exterior', 'count_ext': 'Count'}
+)
+
+```
+
+
+![](./image/scenery.png)
+
+## Row
+ **에임스(Ames)**는 ***아이오와 주립대학교***를 중심으로 교육과 연구가 활발히 이루어지는 도시로, 농업과 공학 분야에서의 혁신이 두드러진다.
+
+높은 삶의 질을 자랑하며, 매년 열리는 아이오와 주립대학교의 다양한 문화 행사와 지역 사회 활동으로도 유명하다. 
+
+***리버밸리 파크(River Valley Park)***와 같은 넓은 자연 공간이 있으며, 전통적인 대학 건물과 현대적인 연구 시설이 조화를 이루는 외관을 자랑한다.
+
+## Row {height=20%}
+### {width=40%}
+![](./image/roof.jfif)
+
+> 꾸준하게 `Gable` 형태의 지붕스타일을 선호하고 있으며, 2000년도에 들어서면서 `HIP` 형태의 지붕스타일의 선호도가 크게 증가했음
+
+### {width=60%}
+```{python}
+#| title: Roof Styles over Years
+fig1.show()
+```
+
+## Row {height=20%}
+### {width=30%}
+![](./image/exterior1.png)
+
+> 과거부터 지속적으로 `MetalSd` 및 `WdSdng`가 외장재로 많이 사용되어 왔으며, 1950년대 이후로 `HdBoard`의 사용량이 크게 증가했다가 2000년대 이후로는 `CemntBd`의 사용량이 증가하였음
+
+### {width=70%}
+```{python}
+#| title: Exterior over Years
+fig2.show()
+```
+
+# 교육
+![](./image/univ.png)
+
+## Row
+
+**Iowa State University 아이오와 주립 대학교**
+
+아이오와 주, Ames시에 소재하고 있는 연구중심 공립 종합대학
+
+미국 내 최상위 130여개의 대학 중 한 곳으로 연구와 교육 분야에서 높은 평가를 받고 있다.
+
+대표적으로 이공계가 강한 학교 중 하나로 손꼽히며 공학 분야가 전반적으로 우수하고, 그 외에도 생명공학, 통계학, 컴퓨터 공학, 원자력 등 다양한 분야의 학문적 명성도 뛰어나다.
+
+아이오와 주립대학교는 지역 커뮤니티 프로그램, 지역 사회와의 협력을 통해 에임스시에 긍정적인 영향을 주고 있다.
+
+
+```{python}
+#| output: false
+# 데이터 전처리
+df_iowa.columns = df_iowa.iloc[1].rename(None)
+df_iowa = df_iowa.iloc[2:, :]
+df_iowa.replace('Small N', np.nan, inplace=True)
+df_iowa.dropna(inplace=True)
+df_iowa.reset_index(drop=True, inplace=True)
+df_iowa['CRB % All Four'] = pd.to_numeric(df_iowa['CRB % All Four'])
+ 
+# 평균 점수 계산
+grade_mean = df_iowa.groupby('District Name').agg(score_mean=('CRB % All Four', 'mean')).reset_index()
+ 
+# 정규화 함수 정의
+def normalize_name(name):
+   name = name.upper()
+   name = re.sub(r'\s+', ' ', name)  # 다중 공백을 단일 공백으로
+   name = re.sub(r'[^A-Z\s]', '', name)  # 알파벳과 공백 제외 모든 문자 제거
+   return name.strip()
+
+# GeoJSON 구역 이름 정규화
+geojson_areas = {normalize_name(feature['properties']['DistrictName']): feature['properties']['DistrictName'] for feature in geo_iowa['features']}
+ 
+# DataFrame 구역 이름 정규화
+df_iowa['Normalized'] = df_iowa['District Name'].apply(normalize_name)
+
+# 유사도 비교 함수 정의
+def find_best_match(name, choices):
+   return process.extractOne(name, choices)[0]
+
+# GeoJSON 구역 이름과 DataFrame 구역 이름 매칭
+name_mapping = {}
+for name in df_iowa['Normalized']:
+   best_match = find_best_match(name, geojson_areas.keys())
+   name_mapping[name] = geojson_areas[best_match]
+ 
+# DataFrame의 통일된 구역 이름 적용
+df_iowa['Unified District'] = df_iowa['Normalized'].map(name_mapping)
+
+# 통합된 데이터프레임과 GeoJSON 데이터 매칭
+grade_mean = df_iowa.groupby('Unified District').agg(score_mean=('CRB % All Four', 'mean')).reset_index()
+
+# Folium 맵 생성
+map_iowa = folium.Map(
+   location=[42.03, -93.64289689856655],
+   zoom_start=8, 
+   tiles='cartodbpositron'
+)
+ 
+# Folium Choropleth 추가
+folium.Choropleth(
+   geo_data=geo_iowa,
+   data=grade_mean,
+   columns=['Unified District', 'score_mean'],
+   key_on='feature.properties.DistrictName',  # GeoJSON의 실제 속성 이름
+   fill_color='PuBu',
+   fill_opacity=0.7,
+   line_opacity=0.2,
+   legend_name='Average Score'
+).add_to(map_iowa)
+ 
+df_ames = df_iowa.query('`District Name`=="AMES COMMUNITY SCHOOL DISTRICT"')
+df_ames = pd.melt(
+   df_ames,
+   id_vars='Grad Year',
+   value_vars=['Avg Eng', 'Avg Math', 'Avg Reading', 'Avg Sci', 'Avg Comp'],  # 긴 형식으로 변환할 열들
+   var_name='Subject',  # 과목명을 담을 열 이름
+   value_name='Average Score'  # 각 과목의 평균 성적을 담을 열 이름
+)
+ 
+fig_score = px.scatter(
+   df_ames,
+   x='Grad Year',
+   y='Average Score',
+   color='Subject',  # 과목별로 색상 다르게 설정
+   title='과목별 평균성적',
+   labels={'Average Score': '평균성적', 'Subject': '과목', 'Grad Year': '졸업년도'},
+   trendline='ols'  # 추세선 추가 (선택사항)
+)
+ 
+# Plotly 그래프를 HTML로 변환
+fig_html = fig_score.to_html(include_plotlyjs='cdn')
+# IFrame 생성 및 Folium Popup에 추가
+iframe = IFrame(html=fig_html, width=700, height=500)
+popup = folium.Popup(iframe, max_width=700)
+ 
+# Marker 추가
+folium.Marker(
+   location=[42.054035, -93.64289689856655],
+   popup=popup,
+   icon=folium.Icon(color='darkpurple')
+).add_to(map_iowa)
+```
+
+```{python}
+#| output: false
+major["Completions"] = major["Completions"].astype(int)
+
+
+fig3 = px.treemap(major,
+                 path=[px.Constant('All Majors'), 'CIP2', 'CIP4'], 
+                 values='Completions',
+                 color='CIP2',  
+                 hover_data=['Completions'], 
+                 color_discrete_sequence=   px.colors.qualitative.Pastel2 + px.colors.qualitative.Set3 + px.colors.qualitative.Pastel
+                )
+
+# 선택/해제 가능한 항목의 설정
+fig3.update_layout(
+    clickmode='event+select',  # 클릭 시 이벤트와 선택 모드 활성화
+    dragmode='select'   # 드래그 모드 설정
+)
+```
+
+```{python}
+#| output: false
+df_sex = df_sex[['Year', 'Sex', 'CIP6', 'Completions']]
+
+# 전공명으로 CIP6을 변환하는 사전 정의
+df_sex['CIP6'] = df_sex['CIP6'].replace({
+   '110103': '정보통신기술',
+    '141901': '기계공학',
+    '520203': '물류공급망관리',
+    '520801': '일반금융',
+    '521401': '일반마케팅_관리'
+})
+
+# 성별과 전공별로 Completions을 집계합니다.
+df_grouped = df_sex.groupby(['Year', 'Sex', 'CIP6'], as_index=False).sum()
+
+fig4 = px.line(
+    df_grouped,
+    x='Year',
+    y='Completions',
+    color='CIP6',
+    facet_col='Sex',
+    line_group='CIP6',
+    markers=True,
+    title="연도별 성별에 따른 전공 선호도 선 그래프",
+    labels={"Year": "연도", "Completions": "전공 선호도 (완료 수)"}
+  
+)
+
+# 레이아웃 업데이트
+fig4.update_layout(
+    width=900,  # 그래프 너비
+    height=450,  # 그래프 높이
+    legend_title="전공",
+    showlegend=True,
+    margin=dict(t=100, b=20, l=20, r=20)
+)
+
+```
+
+```{python}
+# 필요한 열만 선택
+df_major = df_major[['Detailed Occupation', 'Total Population', 'ID CIP2']]
+
+# CIP2 코드 숫자를 한글 전공명으로 변경
+df_major['ID CIP2'] = df_major['ID CIP2'].replace({
+    14: '공학',
+    19: '인문과학',
+    27: '수학_통계',
+    31: '공원_레크리에이션_레저',
+    26: '생물학'
+})
+
+# Detailed Occupation 변수를 한글 직업군으로 변경
+df_major['Detailed Occupation'] = df_major['Detailed Occupation'].replace({
+    'Other managers': '기타경영자',
+    'Software developers': '소프트웨어개발자',
+    'Civil engineers': '토목기사',
+    'Miscellaneous engineers, including nuclear engineers': '기타기술자',
+    'Physicians': '의료인'
+})
+
+# 전공별로 필터링
+df_engineering = df_major[df_major['ID CIP2'] == '공학']
+df_human_sciences = df_major[df_major['ID CIP2'] == '인문과학']
+df_math_statistics = df_major[df_major['ID CIP2'] == '수학_통계']
+df_parks_recreation_leisure = df_major[df_major['ID CIP2'] == '공원_레크리에이션_레저']
+df_biology = df_major[df_major['ID CIP2'] == '생물학']
+
+```
+
+
+## Row {height=10%}
+```{python}
+#| content: valuebox
+#| title: "개교"
+#| icon: door-open
+#| color: "#DCDCDC"
+dict(
+  value = "1858",
+  )
+```
+```{python}
+#| content: valuebox
+#| title: "카네기 분류 미국 대학"
+#| icon: pencil
+#| color: "#DCDCDC"
+dict(
+  value = "Tier 1",
+  )
+```
+```{python}
+#| content: valuebox
+#| title: "2023 재학생"
+#| icon: emoji-smile
+#| color: "#DCDCDC"
+dict(
+  value = "29,542",
+  style = "font-size: 10px;"
+  )
+```
+```{python}
+#| content: valuebox
+#| title: "2022 수여 학위"
+#| icon: award
+#| color: "#DCDCDC"
+dict(
+  value = "8,469"
+  )
+```
+
+
+## Row {height=30%}
+### Col
+
+> 아이오와 주 학군별 성적 분포
+
+```{python}
+#| title: "Ames Community School District의 교육 수준이 우수함"
+map_iowa
+```
+
+### Col
+::: {.panel-tabset}
+## 전공 선호도
+
+> Engineering에 대한 선호도가 높으며, 전체 전공 중 Mechnical Engineering이 선호도가 가장 높음
+
+```{python}
+fig3.show()
+```
+
+## 연도별 성별에 따른 전공 선호도 선 그래프
+
+> 남자는 Mechnical Engineering, 여자는 Marketing 관련 전공 선호도가 가장 높음
+
+```{python}
+fig4.show()
+```
+:::
+
+## Row {height=30%}
+### Col
+
+> 전공별 직업 분포
+
+```{python}
+#| output: False
+# 서브플롯 생성
+fig_subplot = make_subplots(
+    rows=1, cols=5,
+    subplot_titles=('Engineering', 'Human sciences', 'Math & Statistics', 'Parks, Recreation, & Leisure', 'Biology'),
+    specs=[[{"type": "pie"}, {"type": "pie"}, {"type": "pie"},{"type": "pie"}, {"type": "pie"}]]
+)
+
+# 각 전공별 파이 차트 추가
+def add_pie_chart(df, title, row, col):
+    df_pie = df.groupby('Detailed Occupation').sum('Total Population').reset_index()
+    fig_subplot.add_trace(go.Pie(
+        labels=df_pie['Detailed Occupation'],
+        values=df_pie['Total Population'],
+        name=title,
+        textinfo='label+percent',  # 레이블과 퍼센트를 표시
+        insidetextorientation='auto'  # 텍스트가 겹치지 않도록 자동 조정
+    ), row=row, col=col)
+
+add_pie_chart(df_engineering, 'Engineering', 1, 1)
+add_pie_chart(df_human_sciences, 'Human sciences', 1, 2)
+add_pie_chart(df_math_statistics, 'Math & Statistics', 1, 3)
+add_pie_chart(df_parks_recreation_leisure, 'Parks, Recreation, & Leisure', 1, 4)
+add_pie_chart(df_biology, 'Biology', 1, 5)
+
+# 레이아웃 업데이트
+fig_subplot.update_layout(
+    height=800,  # 그래프 높이 설정
+    showlegend=True,  # 전체 레이아웃에서 범례 표시
+    legend=dict(
+        orientation="h",  # 수평으로 범례 표시
+        yanchor="bottom",  # 범례의 수직 앵커
+        y=0.1,  # 범례의 수직 위치
+        xanchor="center",  # 범례의 수평 앵커
+        x=0.5,  # 범례의 수평 위치
+        traceorder="reversed"  # 범례 항목의 순서
+    )
+)
+
+fig_subplot.show()
+```
+
+```{python}
+#| title: "전공 선호도가 가장 높은 Engineering에서는 기타 기술자(33.7%) 직업을 가장 많이 선호"
+fig_subplot.show()
+```

@@ -7,59 +7,116 @@ freeze: true
 
 ```{python}
 #| output: false
-import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
 import json
 import folium
-from folium import IFrame
+import re
+import plotly.express as px
+from fuzzywuzzy import process
+from branca.element import IFrame
 
+# 데이터 로드
 df_iowa = pd.read_excel('Iowa ACT 5 Year Trends by District for Graduating Classes 2019 to 2023 (2).xlsx')
-df_iowa
 geo_iowa = json.load(open('Iowa_School_Districts_2023-2024.geojson', encoding='UTF-8'))
-geo_iowa
 
+# 데이터 전처리
+df_iowa.columns = df_iowa.iloc[1].rename(None)
+df_iowa = df_iowa.iloc[2:, :]
+df_iowa.replace('Small N', np.nan, inplace=True)
+df_iowa.dropna(inplace=True)
+df_iowa.reset_index(drop=True, inplace=True)
+df_iowa['CRB % All Four'] = pd.to_numeric(df_iowa['CRB % All Four'])
+
+# 평균 점수 계산
+grade_mean = df_iowa.groupby('District Name').agg(score_mean=('CRB % All Four', 'mean')).reset_index()
+
+# 정규화 함수 정의
+def normalize_name(name):
+    name = name.upper()
+    name = re.sub(r'\s+', ' ', name)  # 다중 공백을 단일 공백으로
+    name = re.sub(r'[^A-Z\s]', '', name)  # 알파벳과 공백 제외 모든 문자 제거
+    return name.strip()
+
+# GeoJSON 구역 이름 정규화
+geojson_areas = {normalize_name(feature['properties']['DistrictName']): feature['properties']['DistrictName'] for feature in geo_iowa['features']}
+
+# DataFrame 구역 이름 정규화
+df_iowa['Normalized'] = df_iowa['District Name'].apply(normalize_name)
+
+# 유사도 비교 함수 정의
+def find_best_match(name, choices):
+    return process.extractOne(name, choices)[0]
+
+# GeoJSON 구역 이름과 DataFrame 구역 이름 매칭
+name_mapping = {}
+for name in df_iowa['Normalized']:
+    best_match = find_best_match(name, geojson_areas.keys())
+    name_mapping[name] = geojson_areas[best_match]
+
+# DataFrame의 통일된 구역 이름 적용
+df_iowa['Unified District'] = df_iowa['Normalized'].map(name_mapping)
+
+# 통합된 데이터프레임과 GeoJSON 데이터 매칭
+grade_mean = df_iowa.groupby('Unified District').agg(score_mean=('CRB % All Four', 'mean')).reset_index()
+
+# Folium 맵 생성
 map_iowa = folium.Map(
     location=[42.03, -93.64289689856655],
-    zoom_start=12, 
+    zoom_start=8, 
     tiles='cartodbpositron'
 )
+
+# Folium Choropleth 추가
 folium.Choropleth(
-    geo_data = geo_iowa)\
-    .add_to(map_iowa)
+    geo_data=geo_iowa,
+    data=grade_mean,
+    columns=['Unified District', 'score_mean'],
+    key_on='feature.properties.DistrictName',  # GeoJSON의 실제 속성 이름
+    fill_color='PuBu',
+    fill_opacity=0.7,
+    line_opacity=0.2,
+    legend_name='Average Score'
+).add_to(map_iowa)
 
+df_ames = df_iowa.query('`District Name`=="AMES COMMUNITY SCHOOL DISTRICT"')
+df_ames = pd.melt(
+    df_ames,
+    id_vars='Grad Year',
+    value_vars=['Avg Eng', 'Avg Math', 'Avg Reading', 'Avg Sci', 'Avg Comp'],  # 긴 형식으로 변환할 열들
+    var_name='Subject',  # 과목명을 담을 열 이름
+    value_name='Average Score'  # 각 과목의 평균 성적을 담을 열 이름
+)
+
+fig_score = px.scatter(
+    df_ames,
+    x='Grad Year',
+    y='Average Score',
+    color='Subject',  # 과목별로 색상 다르게 설정
+    title='과목별 평균성적',
+    labels={'Average Score': '평균성적', 'Subject': '과목', 'Grad Year': '졸업년도'},
+    trendline='ols'  # 추세선 추가 (선택사항)
+)
+
+# Plotly 그래프를 HTML로 변환
+fig_html = fig_score.to_html(include_plotlyjs='cdn')
+# IFrame 생성 및 Folium Popup에 추가
+iframe = IFrame(html=fig_html, width=700, height=500)
+popup = folium.Popup(iframe, max_width=700)
+
+# Marker 추가
+folium.Marker(
+    location=[42.054035, -93.64289689856655],
+    popup=popup,
+    icon=folium.Icon(color='darkpurple')
+).add_to(map_iowa)
+
+```
+
+
+
+##
+```{python}
+#| title: 아이오와 주 학군별 성적 분포
 map_iowa
-df_iowa
-df_iowa.columns = df_iowa.iloc[1]
-df_iowa = df_iowa.iloc[2:,:]
-df_iowa.reset_index(drop=True)
-df_iowa
-grade_mean = df_iowa.groupby('ACT Dist Code')\
-               .agg(count_roof=('CRB % All Four', 'mean'))\
-               .reset_index()
-grade_mean
-```
-
-
-
-## Row {height=40%}
-```{python}
-#| title: Roof Styles over Years
-fig1.show()
-```
-```{python}
-#| title: Exterior over Years
-fig2.show()
-```
-
-## Row {height=60%}
-```{python}
-#| title: 지상생활면적에 따른 집 가격
-fig3.show()
-```
-```{python}
-#| title: 에임스 시내 위치에 따른 지상생활면적 vs. 집 가격
-map_ames
 ```
