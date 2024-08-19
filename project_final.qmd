@@ -6,6 +6,7 @@ format:
     scrolling: true
     logo: ./image/houseprice_logo.png
 freeze: true
+theme: flatly
 --- 
 
 # 특징
@@ -49,11 +50,16 @@ fig1 = px.bar(
     x='Years',
     y='count_roof',
     color='Roof_Style',
-    title='연도별 지붕 스타일',
+    title='Roof Styles over Years',
     labels={'Roof_Style': 'Roof Style', 'count_roof': 'Count'},
     barmode='stack'
 )
 
+fig1.update_layout(
+    width=900,  # 그래프 너비
+    height=500,  # 그래프 높이
+    showlegend=True,  # 전체 레이아웃에서 범례 표시
+)
 ```
 ```{python}
 #| output: false
@@ -66,21 +72,24 @@ fig2 = px.bar(
     x='Exterior_1st',
     y='count_ext',
     animation_frame='Years',
-    title='연도별 외장재',
+    title='Exterior over Years',
     color="Exterior_1st",
     labels={'Exterior_1st': 'Exterior', 'count_ext': 'Count'}
 )
 
+fig2.update_layout(
+    width=1100,  # 그래프 너비
+    height=500,  # 그래프 높이
+    showlegend=True,  # 전체 레이아웃에서 범례 표시
+)
 ```
 
 
 ![](./image/scenery.png)
 
 ## Row
- **에임스(Ames)**는 ***아이오와 주립대학교***를 중심으로 교육과 연구가 활발히 이루어지는 도시로, 농업과 공학 분야에서의 혁신이 두드러진다.
-
-높은 삶의 질을 자랑하며, 매년 열리는 아이오와 주립대학교의 다양한 문화 행사와 지역 사회 활동으로도 유명하다. 
-
+  **에임스(Ames)**는 ***아이오와 주립대학교***를 중심으로 교육과 연구가 활발히 이루어지는 도시로, 농업과 공학 분야에서의 혁신이 두드러진다.  
+높은 삶의 질을 자랑하며, 매년 열리는 아이오와 주립대학교의 다양한 문화 행사와 지역 사회 활동으로도 유명하다.  
 ***리버밸리 파크(River Valley Park)***와 같은 넓은 자연 공간이 있으며, 전통적인 대학 건물과 현대적인 연구 시설이 조화를 이루는 외관을 자랑한다.
 
 ## Row {height=20%}
@@ -91,7 +100,7 @@ fig2 = px.bar(
 
 ### {width=60%}
 ```{python}
-#| title: Roof Styles over Years
+#| title: 연도별 지붕 스타일
 fig1.show()
 ```
 
@@ -103,7 +112,7 @@ fig1.show()
 
 ### {width=70%}
 ```{python}
-#| title: Exterior over Years
+#| title: 연도별 외장재 
 fig2.show()
 ```
 
@@ -352,36 +361,34 @@ dict(
 ## Row {height=30%}
 ### Col
 
-> 아이오와 주 학군별 성적 분포
 
 ```{python}
-#| title: "Ames Community School District의 교육 수준이 우수함"
+#| title: "아이오와 주 학군별 성적 분포 (2018 ~ 2023)"
 map_iowa
 ```
+`Ames Community School District`의 교육 수준이 우수함
 
 ### Col
 ::: {.panel-tabset}
-## 전공 선호도
-
-> Engineering에 대한 선호도가 높으며, 전체 전공 중 Mechnical Engineering이 선호도가 가장 높음
+## 전공자 수 (2012 ~ 2022)
 
 ```{python}
 fig3.show()
 ```
+> `Engineering`분야가 많고, 전체 전공 중 `Mechnical Engineering`전공자수가 가장 많음
 
-## 연도별 성별에 따른 전공 선호도 선 그래프
-
-> 남자는 Mechnical Engineering, 여자는 Marketing 관련 전공 선호도가 가장 높음
+## 성별과 연도에 따른 전공자 수 변화
 
 ```{python}
 fig4.show()
 ```
+> 남자는 `Mechnical Engineering`, 여자는 `Marketing` 관련 전공이 가장 많음  
+2018년 이후 `Information Technology` 전공자 수가 크게 늘어났는데, AI 기술 발전의 영향으로 해석됨
+
 :::
 
 ## Row {height=30%}
 ### Col
-
-> 전공별 직업 분포
 
 ```{python}
 #| output: False
@@ -427,6 +434,7 @@ fig_subplot.show()
 ```
 
 ```{python}
-#| title: "전공 선호도가 가장 높은 Engineering에서는 기타 기술자(33.7%) 직업을 가장 많이 선호"
+#| title: "전공별 직업 분포 (2014 ~ 2022)"
 fig_subplot.show()
 ```
+`소프트웨어` 및 `의료` 종사자가 많은것을 알 수 있음
