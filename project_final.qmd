@@ -359,7 +359,7 @@ dict(
 
 
 ## Row {height=30%}
-### Col
+### Col {width=40%}
 
 
 ```{python}
@@ -368,7 +368,7 @@ map_iowa
 ```
 `Ames Community School District`의 교육 수준이 우수함
 
-### Col
+### Col {width=60%}
 ::: {.panel-tabset}
 ## 전공자 수 (2012 ~ 2022)
 
