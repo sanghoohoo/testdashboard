@@ -56,9 +56,8 @@ fig1 = px.bar(
 )
 
 fig1.update_layout(
-    width=900,  # 그래프 너비
-    height=500,  # 그래프 높이
     showlegend=True,  # 전체 레이아웃에서 범례 표시
+    margin=dict(t=100, b=50, l=50, r=150)
 )
 ```
 ```{python}
@@ -79,8 +78,9 @@ fig2 = px.bar(
 
 fig2.update_layout(
     width=1100,  # 그래프 너비
-    height=500,  # 그래프 높이
+    height=600,  # 그래프 높이
     showlegend=True,  # 전체 레이아웃에서 범례 표시
+    margin=dict(t=100, b=50, l=50, r=150)
 )
 ```
 
